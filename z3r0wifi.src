@@ -1,0 +1,201 @@
+banner = function(bg,fg)
+
+	print(char(10))
+	lines = ["'########::'#######::'########::::'#####:::'##:::::'##:'####:'########:'####:","..... ##::'##.... ##: ##.... ##::'##.. ##:: ##:'##: ##:. ##:: ##.....::. ##::",":::: ##:::..::::: ##: ##:::: ##:'##:::: ##: ##: ##: ##:: ##:: ##:::::::: ##::","::: ##:::::'#######:: ########:: ##:::: ##: ##: ##: ##:: ##:: ######:::: ##::",":: ##::::::...... ##: ##.. ##::: ##:::: ##: ##: ##: ##:: ##:: ##...::::: ##::",": ##::::::'##:::: ##: ##::. ##::. ##:: ##:: ##: ##: ##:: ##:: ##:::::::: ##::"," ########:. #######:: ##:::. ##::. #####:::. ###. ###::'####: ##:::::::'####:","........:::.......:::..:::::..::::.....:::::...::...:::....::..::::::::....::"]
+	
+	for line in lines
+		print(char(32)*5+line.replace("#","<color="+fg+">#</color>").replace(":","<color="+bg+">:</color>").replace(".","<color="+bg+">.</color>").replace("'","<color="+bg+">'</color>") )
+		wait(0.1)
+	end for
+
+	print(char(32)*62+"<color=#FC766AFF>v1.0.1 - ©"+"unz3r0"+"</color>")
+	print(char(10) * 1.5)
+
+end function
+
+tocolor = function(color)
+return "<color="+color+">"+self.str+"</color>"
+end function
+	
+convert = function(text)
+obj = {}
+obj.str = str(text)
+obj.tocolor = @tocolor
+return obj
+end function
+
+debug = function(msg)
+
+	if params.len == 1 and params[0] == "-d" then
+		date = current_date.split(" ")[0]
+		time = current_date.split(" ")[2]
+		print( convert("[DEBUG] "+date+"+"+time+" - "+msg).tocolor("purple") )
+	end if
+
+end function
+
+libs = function(dirs,names)
+	obj = {}
+	for name in names
+		for dir in dirs
+			file = get_shell.host_computer.File(dir+"/"+name)
+			if typeof(file) != "null" then
+				if file.has_permission("r") then 
+					if file.is_binary then 
+						debug("Loaded "+file.path)
+						obj.push( typeof( include_lib(file.path) ) )
+						obj[typeof( include_lib(file.path) )] = include_lib(file.path) 
+						break
+					end if
+					if not file.is_binary then 
+						debug(file.path+" is not a binary.")
+					end if
+				end if
+				if not file.has_permission("r") then 
+					debug(file.path+" has no read permissions.")
+				end if
+			end if
+			if typeof(file) == "null" then
+				debug(dir+"/"+name+" does not exist.")
+			end if
+		end for
+	end for
+	return obj
+end function
+
+initdb = function(filepath) 
+
+	// get wifi device name
+	netdev = get_shell.host_computer.network_devices.split(" ")[0]
+	globals.netdev = netdev
+	// scan networks
+	networks = {}
+	for network in get_shell.host_computer.wifi_networks(netdev)
+	networks[network.split(" ")[2]] = {}
+	networks[network.split(" ")[2]].bssid = {}
+	networks[network.split(" ")[2]].power = {}
+	networks[network.split(" ")[2]].bssid = network.split(" ")[0] 
+	networks[network.split(" ")[2]].power = network.split(" ")[1] 
+	end for
+	globals.networks = networks
+	debug("netdev => "+netdev)
+	for m in networks.indexes
+		debug(m+" "+networks[m].bssid+" "+networks[m].power)
+	end for
+	debug("DB => "+filepath)	
+	// create database file if not exist
+	filepath = filepath.split("/")
+	file = get_shell.host_computer.File(filepath.join("/"))
+	if typeof(file) == "null"  then
+		filename = filepath.pop
+		dir = []
+		for folder in filepath
+			dir.push(folder)
+			get_shell.host_computer.create_folder(dir.join("/").remove(dir[-1]),dir[-1])
+		end for
+		get_shell.host_computer.touch(dir.join("/"),filename)
+		file = get_shell.host_computer.File(dir.join("/")+"/"+filename)
+		// init database content
+		for essid in networks.indexes
+			if file.get_content == "" then
+				file.set_content(essid+":")
+			else if file.get_content != "" then
+				getfile = file.get_content
+				file.set_content(getfile+char(10)+essid+":")
+			end if
+		end for
+	end if
+end function
+
+ckdb = function(filepath,essid)
+	file = get_shell.host_computer.File(filepath)
+	db = file.get_content.split(char(10))
+	for line in db
+		if line.split(":")[0] == essid and line.split(":")[1] == "" then 
+			print("<color=yellow>[INFO] Password for "+line.split(":")[0]+"</color>")
+			return 0
+			break
+		end if
+		if line.split(":")[0] == essid and line.split(":")[1] != "" then 
+			print("<color=yellow>[INFO] Password for "+line.split(":")[0]+" is known: </color>"+"<color=red>["+line.split(":")[1]+"]</color>")
+			return 1
+			break
+		end if
+	end for
+end function
+
+upddb = function(filepath)
+	file = get_shell.host_computer.File(filepath)
+	db = file.get_content.split(char(10))
+	
+	obj = {}
+	for line in db
+		obj[line.split(":")[0]] = {}
+		// check password is there
+		if line.split(":")[1] != "" then
+		obj[line.split(":")[0]] = line.split(":")[1]
+		end if
+		// if not there check essid and include
+		if line.split(":")[1] == ""  and line.split(":")[0] == essid then
+		obj[line.split(":")[0]] = password
+		end if
+	end for
+	
+	newdb = []
+	for index in obj.indexes
+		if not obj[index] then
+			newdb.push(index+":")
+			debug("not "+newdb)
+		end if
+		if obj[index] then
+			newdb.push(index+":"+obj[index])
+			debug("has "+newdb)
+		end if
+	end for
+
+	file.set_content(newdb.join(char(10)))
+
+end function
+
+ShuffleConnect = function()
+	file = get_shell.host_computer.File(filepath)
+	db = file.get_content.split(char(10))
+	
+	obj = {}
+	for line in db
+		obj[line.split(":")[0]] = {}
+		obj[line.split(":")[0]] = line.split(":")[1]
+	end for
+	
+	list = []
+	for x in obj.indexes
+		list.push(x)
+	end for
+	list.shuffle
+	
+	print("Connecting to <color=yellow>"+list[0]+"</color>")
+	get_shell.host_computer.connect_wifi(netdev,networks[list[0]].bssid,list[0],obj[list[0]])
+
+end function
+
+banner("#00A4CCFF","#F95700FF")
+libraries = libs([current_path,parent_path(launch_path),"/lib"],["crypto.so"])
+CrypTools = libraries["cryptoLib"]
+filepath = home_dir+"/"+"Config"+"/"+"Wifi.txt"
+initdb(filepath)
+
+for essid in networks.indexes
+	if ckdb(filepath,essid) then continue
+	print("<color=yellow>[INFO] Hacking "+essid+"</color>")
+	acks = round(300000/networks[essid].power.remove("%").to_int,0)+1
+	print("<color=yellow>[INFO] "+essid+" needs at least "+acks+" ACKs</color>")
+	CrypTools.airmon("start",netdev)
+	CrypTools.aireplay(networks[essid].bssid,essid,acks)
+	CrypTools.airmon("stop",netdev)
+	filecap = get_shell.host_computer.File(parent_path(launch_path)+"/"+"file.cap")
+	password = CrypTools.aircrack(filecap.path)
+	upddb(filepath)
+	print("<color=yellow>[INFO] "+essid+":"+password+"</color>")
+end for
+
+ShuffleConnect()
