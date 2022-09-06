@@ -1,0 +1,144 @@
+if params.len == 0 then exit("No target.")
+
+HumanOn = 0
+DebugOn = 0
+filepaths = []
+
+tocolor = function(color)
+return "<color="+color+">"+self.str+"</color>"
+end function
+
+convert = function(text)
+obj = {}
+obj.str = str(text)
+obj.tocolor = @tocolor
+return obj
+end function
+
+debug = function(msg)
+if DebugOn == 1 then
+print( convert("[DEBUG] "+msg).tocolor("purple") )
+end if
+end function
+
+for parm in params
+
+	if parm == "-h" then
+		HumanOn = 1
+		continue
+	end if
+
+	if parm == "-d" then
+		DebugOn = 1
+		continue
+	end if
+
+	if parm.indexOf("/") == 0 then
+		if typeof(get_shell.host_computer.File(parm)) != "file" then
+			debug(parm+" is invalid")
+			continue
+		else if typeof(get_shell.host_computer.File(parm)) == "file" then
+			filepaths.push(parm)
+		end if
+	end if
+	
+	if parm.indexOf("/") != 0 then
+		p = parent_path(launch_path)+"/"+parm
+		if typeof(get_shell.host_computer.File(p)) != "file" then
+			debug(p+" is invalid")
+			continue
+		else if typeof(get_shell.host_computer.File(p)) == "file" then
+			filepaths.push(p)
+		end if
+	end if
+
+end for
+
+debug("Paths: "+filepaths)
+if filepaths.len == 0 then 
+	debug("No valid paths")
+	exit()
+end if
+
+print(char(32))
+
+for filepath in filepaths
+
+	map = {}
+	map["file"] = get_shell.host_computer.File(filepath).path
+	map["acc"] = get_shell.host_computer.File(filepath).permissions
+	map["own"] = get_shell.host_computer.File(filepath).owner
+	map["grp"] = get_shell.host_computer.File(filepath).group
+
+	HumanSize = function()
+		s = get_shell.host_computer.File(filepath).size.to_int
+		h = round(s / 1000000,2)
+		o = str(h)+"MB"
+		return o
+	end function
+
+	if HumanOn == 1 then
+		map["size"] = HumanSize
+	else if HumanOn == 0 then
+		map["size"] = get_shell.host_computer.File(filepath).size
+	end if
+
+	octal = function()
+
+		acc = get_shell.host_computer.File(filepath).permissions.values
+		perm = {}
+		perm["typ"] = acc.pull
+		perm["own"] = acc.pull+acc.pull+acc.pull
+		perm["grp"] = acc.pull+acc.pull+acc.pull
+		perm["oth"] = acc.pull+acc.pull+acc.pull
+		
+		r = 4
+		w = 2
+		x = 1
+
+		octa = {}
+		for p in perm.indexes
+			if perm[p] == "rwx" then
+				octa[p] = r+w+x
+			else if perm[p] == "rw-" then
+				octa[p] = r+w
+			else if perm[p] == "r-x" then
+				octa[p] = r+x
+			else if perm[p] == "r--" then
+				octa[p] = r
+			else if perm[p] == "-wx" then
+				octa[p] = w+x
+			else if perm[p] == "-w-" then
+				octa[p] = w
+			else if perm[p] == "--x" then
+				octa[p] = x
+			else if perm[p] == "---" then
+				octa[p] = 0
+			end if
+		end for
+
+		if perm["typ"] == "d" then octa["typ"] = 1
+		if perm["typ"] == "-" then octa["typ"] = 0
+
+		obj = str(octa["typ"]) + str(octa["own"]) + str(octa["grp"]) + str(octa["oth"])
+
+		return obj
+
+	end function
+
+	type = octal.values[0].to_int
+	if type == 1 then
+		map["type"] = "Folder"
+	else if get_shell.host_computer.File(filepath).is_binary then
+		map["type"] = "Binary"
+	else 
+		map["type"] = "Text"
+	end if
+
+	print("File: "+map["file"])
+	print("Size: "+map["size"]+char(32)*3+"Type: "+map["type"])
+	print("Owner: "+map["own"]+char(32)*3+"Group: "+map["grp"])
+	print("Access: ("+map["acc"]+"/"+octal+")")
+	print()
+
+end for
